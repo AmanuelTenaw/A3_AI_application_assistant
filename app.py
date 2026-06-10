@@ -46,7 +46,10 @@ from langchain_community.vectorstores import Chroma
 
 load_dotenv()
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+
+client = OpenAI(api_key=api_key)
+# client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # =====================================================
@@ -316,7 +319,7 @@ def create_rag_vectorstore(resume_text, job_text):
 
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small",
-        api_key=os.getenv("OPENAI_API_KEY")
+        api_key=api_key
     )
 
     vectorstore = Chroma.from_texts(
