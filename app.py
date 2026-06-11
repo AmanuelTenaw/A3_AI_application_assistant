@@ -373,38 +373,31 @@ def remove_duplicate_docs(docs):
 def retrieve_docs(question, vectorstore):
     """
     Retrieve relevant resume and job description chunks for a question.
-
-    This function searches the resume and job description separately.
-    This helps ensure the final answer compares both the candidate's
-    background and the job requirements instead of only retrieving from one side.
-
-    Args:
-        question (str):
-            User question or guided tool prompt.
-
-        vectorstore:
-            Chroma vector database.
-
-    Returns:
-        list:
-            Relevant resume and job description source chunks.
+    This version avoids Chroma filter issues on Streamlit Cloud.
     """
 
     resume_query = question + " candidate resume skills experience projects education technical skills"
     job_query = question + " job description required skills qualifications responsibilities technologies"
 
-
-    resume_docs = vectorstore.similarity_search(
+    all_resume_results = vectorstore.similarity_search(
         resume_query,
-        k=3,
-        filter={"source": "Resume"}
+        k=10
     )
 
-    job_docs = vectorstore.similarity_search(
+    all_job_results = vectorstore.similarity_search(
         job_query,
-        k=3,
-        filter={"source": "Job Description"}
+        k=10
     )
+
+    resume_docs = [
+        doc for doc in all_resume_results
+        if doc.metadata.get("source") == "Resume"
+    ][:3]
+
+    job_docs = [
+        doc for doc in all_job_results
+        if doc.metadata.get("source") == "Job Description"
+    ][:3]
 
     return remove_duplicate_docs(resume_docs + job_docs)
 
