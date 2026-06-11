@@ -136,6 +136,12 @@ if "guided_results" not in st.session_state:
 if "current_input_key" not in st.session_state:
     st.session_state.current_input_key = ""
 
+if "active_resume_text" not in st.session_state:
+    st.session_state.active_resume_text = ""
+
+if "active_job_text" not in st.session_state:
+    st.session_state.active_job_text = ""
+
 # =====================================================
 # INPUT PROCESSING FUNCTIONS
 # Handles PDF extraction and pasted text cleaning
@@ -794,10 +800,21 @@ def generate_download_text(title, content):
 left_col, right_col = st.columns(2)
 
 with left_col:
-    resume_text = get_resume_input()
+    new_resume_text = get_resume_input()
+
+    if st.button("Add Resume"):
+        st.session_state.active_resume_text = new_resume_text
+        st.session_state.current_input_key = ""
 
 with right_col:
-    job_text = get_job_input()
+    new_job_text = get_job_input()
+
+    if st.button("Add Job Description"):
+        st.session_state.active_job_text = new_job_text
+        st.session_state.current_input_key = ""
+
+resume_text = st.session_state.active_resume_text
+job_text = st.session_state.active_job_text
 
 
 # Show previews only after text exists.
