@@ -393,17 +393,16 @@ def retrieve_docs(question, vectorstore):
     resume_query = question + " candidate resume skills experience projects education technical skills"
     job_query = question + " job description required skills qualifications responsibilities technologies"
 
-    resume_docs = vectorstore.max_marginal_relevance_search(
+
+    resume_docs = vectorstore.similarity_search(
         resume_query,
         k=3,
-        fetch_k=10,
         filter={"source": "Resume"}
     )
 
-    job_docs = vectorstore.max_marginal_relevance_search(
+    job_docs = vectorstore.similarity_search(
         job_query,
         k=3,
-        fetch_k=10,
         filter={"source": "Job Description"}
     )
 
