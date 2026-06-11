@@ -127,12 +127,14 @@ if "job_match_docs" not in st.session_state:
 if "guided_results" not in st.session_state:
     st.session_state.guided_results = {}
 
-if "last_resume_text" not in st.session_state:
-    st.session_state.last_resume_text = ""
+#if "last_resume_text" not in st.session_state:
+#    st.session_state.last_resume_text = ""
 
-if "last_job_text" not in st.session_state:
-    st.session_state.last_job_text = ""
+#if "last_job_text" not in st.session_state:
+#    st.session_state.last_job_text = ""
 
+if "current_input_key" not in st.session_state:
+    st.session_state.current_input_key = ""
 
 # =====================================================
 # INPUT PROCESSING FUNCTIONS
@@ -811,18 +813,27 @@ if job_text:
 # The RAG app only starts after both resume and job description are provided.
 if resume_text and job_text:
 
-    # Reset previous outputs when the user changes the resume or job description.
-    if (
-        resume_text != st.session_state.last_resume_text
-        or job_text != st.session_state.last_job_text
-    ):
+    current_input_key = str(hash(resume_text + job_text))
+    
+    if current_input_key != st.session_state.current_input_key:
         st.session_state.chat_history = []
         st.session_state.job_match_result = None
         st.session_state.job_match_docs = []
         st.session_state.guided_results = {}
+        st.session_state.current_input_key = current_input_key
 
-        st.session_state.last_resume_text = resume_text
-        st.session_state.last_job_text = job_text
+    # Reset previous outputs when the user changes the resume or job description.
+    #if (
+    #    resume_text != st.session_state.last_resume_text
+    #    or job_text != st.session_state.last_job_text
+    #):
+     #   st.session_state.chat_history = []
+      #  st.session_state.job_match_result = None
+       # st.session_state.job_match_docs = []
+        #st.session_state.guided_results = {}
+
+ #       st.session_state.last_resume_text = resume_text
+#        st.session_state.last_job_text = job_text
 
     st.divider()
 
