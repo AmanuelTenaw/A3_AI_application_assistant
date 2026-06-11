@@ -1,34 +1,11 @@
 """
 A³ - AI Application Assistant
-
 Author: Amanuel Tenaw
-
-Description:
-A³ is a RAG-powered career assistant that compares a candidate's resume
-against a job description. It helps users analyze job fit, identify missing
-skills, improve resume bullets, prepare for interviews, create a good-fit
-summary, and generate a tailored cover letter.
-
-Main Features:
-- Resume input by PDF upload or pasted text
-- Job description input by PDF upload or pasted text
-- RAG-based job match analysis
-- Resume/job description Q&A through Ask AAA
-- Guided career tools 
-- Retrieved source chunk visibility for transparency
-- Downloadable results
-
-Tech Stack:
-- Streamlit
-- OpenAI API
-- LangChain
-- ChromaDB
-- OpenAI Embeddings
-- pypdf
 """
 
 import os
 import re
+import uuid
 import streamlit as st
 from pypdf import PdfReader
 from dotenv import load_dotenv
@@ -37,24 +14,21 @@ from openai import OpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
+from langchain_core.documents import Document
 
 
 # =====================================================
 # ENVIRONMENT SETUP
-# Loads API keys and initializes the OpenAI client
 # =====================================================
 
 load_dotenv()
 
 api_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
-
 client = OpenAI(api_key=api_key)
-# client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # =====================================================
 # STREAMLIT PAGE CONFIGURATION
-# Sets the browser title and page layout
 # =====================================================
 
 st.set_page_config(
@@ -64,21 +38,17 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-
-/* Main page */
 .block-container {
     padding-top: 2rem;
     padding-bottom: 2rem;
     max-width: 1200px;
 }
 
-/* Expanders */
 div[data-testid="stExpander"] {
     border: 1px solid #E5E7EB;
     border-radius: 10px;
 }
 
-/* Buttons */
 .stButton > button {
     width: 100%;
     border-radius: 8px;
@@ -86,14 +56,12 @@ div[data-testid="stExpander"] {
     font-weight: 500;
 }
 
-/* Upload boxes */
 [data-testid="stFileUploader"] {
     border: 1px solid #E5E7EB;
     border-radius: 10px;
     padding: 10px;
 }
 
-/* Cleaner spacing */
 h1 {
     margin-bottom: 0.25rem;
 }
@@ -101,9 +69,8 @@ h1 {
 h2, h3 {
     margin-top: 1rem;
 }
-
 </style>
-""", unsafe_allow_html=True) 
+""", unsafe_allow_html=True)
 
 st.title("A³ - AI Application Assistant")
 st.caption("Analyze • Prepare • Succeed")
@@ -112,7 +79,6 @@ st.write("Upload or paste your resume and job description to begin.")
 
 # =====================================================
 # SESSION STATE SETUP
-# Stores app results so they stay visible after reruns
 # =====================================================
 
 if "chat_history" not in st.session_state:
@@ -127,12 +93,6 @@ if "job_match_docs" not in st.session_state:
 if "guided_results" not in st.session_state:
     st.session_state.guided_results = {}
 
-#if "last_resume_text" not in st.session_state:
-#    st.session_state.last_resume_text = ""
-
-#if "last_job_text" not in st.session_state:
-#    st.session_state.last_job_text = ""
-
 if "current_input_key" not in st.session_state:
     st.session_state.current_input_key = ""
 
@@ -142,66 +102,30 @@ if "active_resume_text" not in st.session_state:
 if "active_job_text" not in st.session_state:
     st.session_state.active_job_text = ""
 
+
 # =====================================================
 # INPUT PROCESSING FUNCTIONS
-# Handles PDF extraction and pasted text cleaning
 # =====================================================
 
 def extract_pdf_text(uploaded_file):
-    """
-    Extract text from an uploaded PDF file.
-
-    Args:
-        uploaded_file:
-            A PDF file uploaded through Streamlit's file uploader.
-
-    Returns:
-        str:
-            Cleaned text extracted from all readable PDF pages.
-    """
-
     reader = PdfReader(uploaded_file)
     text = ""
 
     for page in reader.pages:
         page_text = page.extract_text()
-
         if page_text:
             text += page_text + " "
 
     text = re.sub(r"\s+", " ", text)
-
     return text.strip()
 
 
 def clean_text(text):
-    """
-    Clean pasted or extracted text by removing extra whitespace.
-
-    Args:
-        text (str):
-            Raw text from a PDF or text area.
-
-    Returns:
-        str:
-            Cleaned text.
-    """
-
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
 
 def get_resume_input():
-    """
-    Display resume input options in the Streamlit UI.
-
-    The user can either upload a resume PDF or paste resume text.
-
-    Returns:
-        str:
-            Cleaned resume text.
-    """
-
     st.subheader("Resume Input")
 
     resume_input_type = st.radio(
@@ -234,16 +158,6 @@ def get_resume_input():
 
 
 def get_job_input():
-    """
-    Display job description input options in the Streamlit UI.
-
-    The user can either upload a job description PDF or paste job text.
-
-    Returns:
-        str:
-            Cleaned job description text.
-    """
-
     st.subheader("Job Description Input")
 
     job_input_type = st.radio(
@@ -277,31 +191,9 @@ def get_job_input():
 
 # =====================================================
 # RAG VECTORSTORE CREATION
-# Splits documents, embeds chunks, and stores them in ChromaDB
 # =====================================================
 
 def create_rag_vectorstore(resume_text, job_text):
-    """
-    Create the RAG vector database from resume and job description text.
-
-    Process:
-    1. Split resume and job description into smaller chunks.
-    2. Attach metadata to identify each chunk source.
-    3. Convert chunks into embeddings using OpenAI embeddings.
-    4. Store the embedded chunks in ChromaDB.
-
-    Args:
-        resume_text (str):
-            Candidate resume text.
-
-        job_text (str):
-            Job description text.
-
-    Returns:
-        Chroma:
-            Vector database containing resume and job description chunks.
-    """
-
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,
         chunk_overlap=100
@@ -313,24 +205,26 @@ def create_rag_vectorstore(resume_text, job_text):
     texts = []
     metadatas = []
 
-    # Store resume chunks with Resume metadata.
     for chunk in resume_chunks:
         if chunk.strip():
             texts.append(chunk)
             metadatas.append({"source": "Resume"})
 
-    # Store job description chunks with Job Description metadata.
     for chunk in job_chunks:
         if chunk.strip():
             texts.append(chunk)
             metadatas.append({"source": "Job Description"})
+
+    if not texts:
+        return None
 
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small",
         api_key=api_key
     )
 
-    import uuid
+    # IMPORTANT:
+    # Unique collection name prevents Streamlit Cloud/Chroma from reusing old job descriptions.
     vectorstore = Chroma.from_texts(
         texts=texts,
         embedding=embeddings,
@@ -338,25 +232,14 @@ def create_rag_vectorstore(resume_text, job_text):
         collection_name=f"aaa_{uuid.uuid4().hex}"
     )
 
+    return vectorstore
+
 
 # =====================================================
 # RETRIEVAL FUNCTIONS
-# Retrieves relevant chunks from the vector database
 # =====================================================
 
 def remove_duplicate_docs(docs):
-    """
-    Remove duplicate retrieved chunks.
-
-    Args:
-        docs (list):
-            Retrieved LangChain document objects.
-
-    Returns:
-        list:
-            Unique retrieved documents.
-    """
-
     unique_docs = []
     seen_texts = set()
 
@@ -372,53 +255,58 @@ def remove_duplicate_docs(docs):
 
 def retrieve_docs(question, vectorstore):
     """
-    Retrieve relevant resume and job description chunks for a question.
-    This version avoids Chroma filter issues on Streamlit Cloud.
+    ChromaDB retrieval fix for Streamlit Cloud.
+
+    This keeps ChromaDB but avoids broken LangChain wrapper methods like:
+    - vectorstore.similarity_search()
+    - vectorstore.max_marginal_relevance_search()
+
+    Instead, it embeds the query and searches the Chroma collection directly.
     """
 
     resume_query = question + " candidate resume skills experience projects education technical skills"
     job_query = question + " job description required skills qualifications responsibilities technologies"
 
-    all_resume_results = vectorstore.similarity_search(
-        resume_query,
-        k=10
+    embeddings = OpenAIEmbeddings(
+        model="text-embedding-3-small",
+        api_key=api_key
     )
 
-    all_job_results = vectorstore.similarity_search(
-        job_query,
-        k=10
-    )
+    def chroma_direct_search(query, source_name, top_k=3):
+        query_embedding = embeddings.embed_query(query)
 
-    resume_docs = [
-        doc for doc in all_resume_results
-        if doc.metadata.get("source") == "Resume"
-    ][:3]
+        results = vectorstore._collection.query(
+            query_embeddings=[query_embedding],
+            n_results=20,
+            include=["documents", "metadatas"]
+        )
 
-    job_docs = [
-        doc for doc in all_job_results
-        if doc.metadata.get("source") == "Job Description"
-    ][:3]
+        docs = []
+
+        documents = results.get("documents", [[]])[0]
+        metadatas = results.get("metadatas", [[]])[0]
+
+        for text, metadata in zip(documents, metadatas):
+            if metadata and metadata.get("source") == source_name:
+                docs.append(
+                    Document(
+                        page_content=text,
+                        metadata=metadata
+                    )
+                )
+
+            if len(docs) == top_k:
+                break
+
+        return docs
+
+    resume_docs = chroma_direct_search(resume_query, "Resume", top_k=3)
+    job_docs = chroma_direct_search(job_query, "Job Description", top_k=3)
 
     return remove_duplicate_docs(resume_docs + job_docs)
 
 
 def retrieve_match_context(vectorstore):
-    """
-    Retrieve a broad set of chunks for the job match analysis.
-
-    Job match analysis needs more context than a normal question,
-    so this function uses multiple targeted queries covering skills,
-    projects, gaps, technologies, and responsibilities.
-
-    Args:
-        vectorstore:
-            Chroma vector database.
-
-    Returns:
-        list:
-            Retrieved source chunks for the full job match analysis.
-    """
-
     queries = [
         "required skills qualifications responsibilities job requirements candidate matching skills experience",
         "technical skills programming languages frameworks cloud aws frontend backend database ai",
@@ -436,18 +324,6 @@ def retrieve_match_context(vectorstore):
 
 
 def docs_to_context(docs):
-    """
-    Convert retrieved document chunks into formatted context for the LLM.
-
-    Args:
-        docs (list):
-            Retrieved LangChain documents.
-
-    Returns:
-        str:
-            Formatted context with source labels.
-    """
-
     return "\n\n".join(
         [
             f"Source: {doc.metadata.get('source', 'Unknown')}\n{doc.page_content}"
@@ -458,26 +334,9 @@ def docs_to_context(docs):
 
 # =====================================================
 # LLM ANALYSIS FUNCTIONS
-# Uses retrieved RAG context to generate grounded outputs
 # =====================================================
 
 def analyze_job_match(vectorstore):
-    """
-    Generate a RAG-grounded job match analysis.
-
-    The model is instructed to use only retrieved resume and job
-    description context. This prevents the app from inventing skills,
-    projects, or experience that are not in the resume.
-
-    Args:
-        vectorstore:
-            Chroma vector database.
-
-    Returns:
-        tuple:
-            analysis text and source documents.
-    """
-
     docs = retrieve_match_context(vectorstore)
     context = docs_to_context(docs)
 
@@ -540,24 +399,6 @@ Retrieved Context:
 
 
 def generate_rag_answer(question, vectorstore, include_chat_history=True):
-    """
-    Generate a RAG-based answer for Ask AAA or guided career tools.
-
-    Args:
-        question (str):
-            User question or guided feature prompt.
-
-        vectorstore:
-            Chroma vector database.
-
-        include_chat_history (bool):
-            Whether to include recent chat history in the prompt.
-
-    Returns:
-        tuple:
-            generated answer and retrieved source documents.
-    """
-
     docs = retrieve_docs(question, vectorstore)
     context = docs_to_context(docs)
 
@@ -613,24 +454,6 @@ Question:
 
 
 def ask_aaa(question, vectorstore):
-    """
-    Run the main Ask AAA chat workflow.
-
-    This function retrieves relevant RAG context, generates an answer,
-    and saves the question/answer pair in chat history.
-
-    Args:
-        question (str):
-            User's question.
-
-        vectorstore:
-            Chroma vector database.
-
-    Returns:
-        tuple:
-            generated answer and source documents.
-    """
-
     answer, docs = generate_rag_answer(
         question=question,
         vectorstore=vectorstore,
@@ -649,32 +472,9 @@ def ask_aaa(question, vectorstore):
 
 # =====================================================
 # GUIDED CAREER TOOLS
-# Prebuilt prompts for common job application tasks
 # =====================================================
 
 def run_guided_feature(feature_name, vectorstore):
-    """
-    Run one of the guided career tools.
-
-    Supported tools:
-    - Matching and Missing Skills Analysis
-    - Resume Bullet Improvement
-    - Interview Prep Questions
-    - Good Fit Summary
-    - Cover Letter
-
-    Args:
-        feature_name (str):
-            Key identifying which guided feature to run.
-
-        vectorstore:
-            Chroma vector database.
-
-    Returns:
-        tuple:
-            generated answer and retrieved source documents.
-    """
-
     feature_prompts = {
         "missing_skills": """
 Analyze the candidate's missing skills for this job.
@@ -758,25 +558,9 @@ Requirements:
 
 # =====================================================
 # DOWNLOAD HELPER
-# Formats generated results for text download
 # =====================================================
 
 def generate_download_text(title, content):
-    """
-    Format generated content for text file downloads.
-
-    Args:
-        title (str):
-            Title of the generated output.
-
-        content (str):
-            Main generated content.
-
-    Returns:
-        str:
-            Download-ready text.
-    """
-
     return f"""
 {title}
 
@@ -786,64 +570,49 @@ def generate_download_text(title, content):
 
 # =====================================================
 # STREAMLIT USER INTERFACE
-# Main app layout and workflow
 # =====================================================
 
 left_col, right_col = st.columns(2)
 
 with left_col:
-    # Read the newest resume input from the UI.
-    # This value is temporary until the user clicks "Add Resume".
     new_resume_text = get_resume_input()
 
     if st.button("Add Resume"):
         if new_resume_text:
-            # Replace the active resume with the newly uploaded/pasted resume.
-            # This prevents the new resume from being combined with the previous one.
             st.session_state.active_resume_text = new_resume_text
 
-            # Clear old outputs because they were created from the previous inputs.
             st.session_state.chat_history = []
             st.session_state.job_match_result = None
             st.session_state.job_match_docs = []
             st.session_state.guided_results = {}
 
-            # Force the RAG system to rebuild from the new active resume/job pair.
             st.session_state.current_input_key = ""
             st.rerun()
         else:
             st.warning("Please upload or paste a resume before clicking Add Resume.")
 
 with right_col:
-    # Read the newest job description input from the UI.
-    # This value is temporary until the user clicks "Add Job Description".
     new_job_text = get_job_input()
 
     if st.button("Add Job Description"):
         if new_job_text:
-            # Replace the active job description with the newly uploaded/pasted job description.
-            # This prevents the new job description from being combined with the previous one.
             st.session_state.active_job_text = new_job_text
 
-            # Clear old outputs because they were created from the previous inputs.
             st.session_state.chat_history = []
             st.session_state.job_match_result = None
             st.session_state.job_match_docs = []
             st.session_state.guided_results = {}
 
-            # Force the RAG system to rebuild from the new active resume/job pair.
             st.session_state.current_input_key = ""
             st.rerun()
         else:
             st.warning("Please upload or paste a job description before clicking Add Job Description.")
 
-# From this point forward, the app uses only the confirmed active inputs.
-# Changing a text box or uploader will not affect RAG until the matching Add button is clicked.
+
 resume_text = st.session_state.active_resume_text
 job_text = st.session_state.active_job_text
 
 
-# Show previews only after text exists.
 if resume_text:
     with st.expander("View Resume Preview"):
         st.text_area("Resume Content Preview", resume_text, height=200)
@@ -853,11 +622,10 @@ if job_text:
         st.text_area("Job Description Content Preview", job_text, height=200)
 
 
-# The RAG app only starts after both resume and job description are provided.
 if resume_text and job_text:
 
     current_input_key = str(hash(resume_text + job_text))
-    
+
     if current_input_key != st.session_state.current_input_key:
         st.session_state.chat_history = []
         st.session_state.job_match_result = None
@@ -867,9 +635,12 @@ if resume_text and job_text:
 
     st.divider()
 
-    # Build the RAG vectorstore from the latest resume/job text.
     with st.spinner("Building RAG system..."):
         vectorstore = create_rag_vectorstore(resume_text, job_text)
+
+    if vectorstore is None:
+        st.error("Could not build RAG system because no text chunks were created.")
+        st.stop()
 
     st.success("RAG system ready.")
 
@@ -976,7 +747,6 @@ if resume_text and job_text:
                 "file_name": "interview_prep_questions.txt"
             }
 
-
         if st.button("Generate Cover Letter"):
             with st.spinner("Writing tailored cover letter..."):
                 answer, source_docs = run_guided_feature("cover_letter", vectorstore)
@@ -1008,12 +778,9 @@ if resume_text and job_text:
                 "file_name": "good_fit_summary.txt"
             }
 
-        
-
 
     # =====================================================
     # GUIDED TOOL RESULTS SECTION
-    # Keeps generated guided outputs visible in dropdowns
     # =====================================================
 
     if st.session_state.guided_results:
@@ -1040,4 +807,4 @@ if resume_text and job_text:
                         st.write(doc.page_content)
 
 else:
-    st.info("Please provide both a resume and a job description using either PDF upload or pasted text.") 
+    st.info("Please provide both a resume and a job description using either PDF upload or pasted text.")
