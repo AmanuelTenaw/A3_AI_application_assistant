@@ -797,56 +797,90 @@ def generate_download_text(title, content):
 # Main app layout and workflow
 # =====================================================
 
-# =====================================================
-# STREAMLIT USER INTERFACE
-# Main app layout and workflow
-# =====================================================
-
 left_col, right_col = st.columns(2)
 
 with left_col:
-    # Get the newest resume input from either PDF upload or pasted text.
-    # This is only temporary until the user clicks "Add Resume".
+    # Read the newest resume input from the UI.
+    # This value is temporary until the user clicks "Add Resume".
     new_resume_text = get_resume_input()
 
     if st.button("Add Resume"):
-        # Save the new resume as the active resume.
-        # This replaces the previous resume instead of combining with it.
-        st.session_state.active_resume_text = new_resume_text
+        if new_resume_text:
+            # Replace the active resume with the newly uploaded/pasted resume.
+            # This prevents the new resume from being combined with the previous one.
+            st.session_state.active_resume_text = new_resume_text
 
-        # Clear old outputs because they were based on the previous resume/job pair.
-        st.session_state.chat_history = []
-        st.session_state.job_match_result = None
-        st.session_state.job_match_docs = []
-        st.session_state.guided_results = {}
+            # Clear old outputs because they were created from the previous inputs.
+            st.session_state.chat_history = []
+            st.session_state.job_match_result = None
+            st.session_state.job_match_docs = []
+            st.session_state.guided_results = {}
 
-        # Force the app to rebuild the RAG system using the new active input.
-        st.session_state.current_input_key = ""
-        st.rerun()
+            # Force the RAG system to rebuild from the new active resume/job pair.
+            st.session_state.current_input_key = ""
+            st.rerun()
+        else:
+            st.warning("Please upload or paste a resume before clicking Add Resume.")
 
 with right_col:
-    # Get the newest job description input from either PDF upload or pasted text.
-    # This is only temporary until the user clicks "Add Job Description".
+    # Read the newest job description input from the UI.
+    # This value is temporary until the user clicks "Add Job Description".
     new_job_text = get_job_input()
 
     if st.button("Add Job Description"):
-        # Save the new job description as the active job description.
-        # This replaces the previous job description instead of combining with it.
-        st.session_state.active_job_text = new_job_text
+        if new_job_text:
+            # Replace the active job description with the newly uploaded/pasted job description.
+            # This prevents the new job description from being combined with the previous one.
+            st.session_state.active_job_text = new_job_text
 
-        # Clear old outputs because they were based on the previous resume/job pair.
+            # Clear old outputs because they were created from the previous inputs.
+            st.session_state.chat_history = []
+            st.session_state.job_match_result = None
+            st.session_state.job_match_docs = []
+            st.session_state.guided_results = {}
+
+            # Force the RAG system to rebuild from the new active resume/job pair.
+            st.session_state.current_input_key = ""
+            st.rerun()
+        else:
+            st.warning("Please upload or paste a job description before clicking Add Job Description.")
+
+# From this point forward, the app uses only the confirmed active inputs.
+# Changing a text box or uploader will not affect RAG until the matching Add button is clicked.
+resume_text = st.session_state.active_resume_text
+job_text = st.session_state.active_job_text
+
+
+# Show previews only after text exists.
+if resume_text:
+    with st.expander("View Resume Preview"):
+        st.text_area("Resume Content Preview", resume_text, height=200)
+
+if job_text:
+    with st.expander("View Job Description Preview"):
+        st.text_area("Job Description Content Preview", job_text, height=200)
+
+
+# The RAG app only starts after both resume and job description are provided.
+if resume_text and job_text:
+
+    current_input_key = str(hash(resume_text + job_text))
+    
+    if current_input_key != st.session_state.current_input_key:
         st.session_state.chat_history = []
         st.session_state.job_match_result = None
         st.session_state.job_match_docs = []
         st.session_state.guided_results = {}
+        st.session_state.current_input_key = current_input_key
 
-        # Force the app to rebuild the RAG system using the new active input.
-        st.session_state.current_input_key = ""
-        st.rerun()
+    st.divider()
 
-# Use only the confirmed active inputs for preview, RAG, analysis, and chat.
-resume_text = st.session_state.active_resume_text
-job_text = st.session_state.active_job_text
+    # Build the RAG vectorstore from the latest resume/job text.
+    with st.spinner("Building RAG system..."):
+        vectorstore = create_rag_vectorstore(resume_text, job_text)
+
+    st.success("RAG system ready.")
+
 
     # =====================================================
     # JOB MATCH ANALYSIS SECTION
