@@ -1,8 +1,8 @@
 # A³ - AI Application Assistant
 
-A³ (AI Application Assistant) is a Retrieval-Augmented Generation (RAG) career assistant designed to help job seekers analyze their resumes against job descriptions, identify skill gaps, improve application materials, prepare for interviews and generate cover letters.
-
-The application combines OpenAI's language models, vector embeddings, and semantic search to provide context-aware career guidance grounded in the user's resume and the target job description.
+A³ (AI Application Assistant) is a Retrieval-Augmented Generation (RAG) career assistant that helps job seekers evaluate their resumes against job descriptions using semantic search, vector embeddings, and Large Language Models (LLMs).
+The application analyzes resume-job alignment, identifies skill gaps, generates tailored career guidance, prepares interview materials, and creates customized cover letters using retrieved context from both the resume and job description.
+Rather than relying solely on an LLM’s general knowledge, A³ uses Retrieval-Augmented Generation (RAG) to ground responses in the user’s uploaded documents, improving relevance, transparency, and accuracy.
 
 ---
 
@@ -23,11 +23,12 @@ This flexibility allows the application to work with resumes and job description
 
 The application:
 
-1. Splits resume and job description into chunks.
-2. Generates vector embeddings using OpenAI Embeddings.
-3. Stores embeddings in ChromaDB.
-4. Retrieves relevant context using semantic search.
-5. Produces a grounded job match analysis.
+1.	Splits resume and job description into chunks.
+2.	Generates vector embeddings using OpenAI Embeddings.
+3.	Stores embeddings in ChromaDB.
+4.	Retrieves relevant context using semantic search.
+5.	Generates a grounded job fit analysis.
+
 
 Outputs include:
 
@@ -50,7 +51,7 @@ Users can ask custom questions such as:
 * What are my biggest skill gaps?
 * How well does my experience align with the job requirements?
 
-Responses are generated using retrieved resume and job description context rather than relying solely on the language model.
+Responses are generated using retrieved resume and job description context through Retrieval-Augmented Generation (RAG), while maintaining limited conversational memory for follow-up questions.
 
 ---
 
@@ -63,7 +64,7 @@ Identifies:
 * Existing strengths
 * Missing qualifications
 * Recommended learning priorities
-* Relevant projects to emphasize\
+* Relevant projects to emphasize
 
 #### Cover Letter Generation
 
@@ -71,7 +72,8 @@ Generates a tailored cover letter based on:
 
 * Resume content
 * Job requirements
-* Relevant projects and experience
+* Relevant projects
+* Candidate experience
 
 
 #### Interview Preparation
@@ -83,7 +85,7 @@ Provides:
 * Project-Based Questions
 * Gap-Based Questions
 
-Along with suggested talking points.
+Each question includes suggested talking points and answer strategies.
 
 #### Resume Bullet Improvement
 
@@ -119,7 +121,7 @@ Embeddings are stored in:
 
 * ChromaDB
 
-Metadata is attached to each chunk to distinguish between:
+Mmetadata indicating whether each chunk originated from:
 
 * Resume
 * Job Description
@@ -128,16 +130,18 @@ Metadata is attached to each chunk to distinguish between:
 
 When a user asks a question:
 
-1. Semantic search retrieves the most relevant chunks.
-2. Resume and job description context are combined.
-3. Duplicate chunks are removed.
-4. Retrieved context is passed to the language model.
+1.	Semantic search retrieves relevant chunks.
+2.	Resume and job description context are combined.
+3.	Duplicate chunks are removed.
+4.	Retrieved context is passed to the language model.
+
 
 ### Generation
 
-OpenAI GPT-4o Mini generates grounded responses using only the retrieved context.
+Responses are generated using:
+•	GPT-4o Mini
+The model is instructed to use only the retrieved context whenever possible, reducing hallucinations and improving relevance.
 
-This helps reduce hallucinations and improves answer relevance.
 
 ---
 
@@ -178,9 +182,8 @@ A3_AI_application_assistant/
 ├── .gitignore
 │
 ├── .streamlit/
-│   └── config.toml
-│
-└── chroma_db/
+   └── config.toml
+
 ```
 
 ---
@@ -248,14 +251,14 @@ streamlit run app.py
 ## Future Enhancements
 
 * Persistent vector storage
-* User authentication
-* Job application tracking
-* Multi-resume management
-* Recruiter feedback analysis
-* Resume version comparison
-* LinkedIn profile integration
-* ATS optimization scoring
-* Cloud deployment and monitoring
+*	User authentication
+*	Multi-resume management
+*	Job application tracking
+*	ATS optimization scoring
+*	Resume version comparison
+*	Recruiter feedback analysis
+*	LinkedIn profile integration
+*	Cloud monitoring and analytics
 
 ---
 
