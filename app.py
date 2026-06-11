@@ -330,13 +330,13 @@ def create_rag_vectorstore(resume_text, job_text):
         api_key=api_key
     )
 
+    import uuid
     vectorstore = Chroma.from_texts(
         texts=texts,
         embedding=embeddings,
-        metadatas=metadatas
+        metadatas=metadatas,
+        collection_name=f"aaa_{uuid.uuid4().hex}"
     )
-
-    return vectorstore
 
 
 # =====================================================
